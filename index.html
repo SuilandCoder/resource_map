@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0,minimum-scale=1.0, user-scalable=no"> -->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <link rel="stylesheet" href="./css/normalize.css">
+    <!-- <link rel="stylesheet" href="./lib/esri/css/main.css"> -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.18/esri/themes/light/main.css">
+    <link rel="stylesheet" href="https://at.alicdn.com/t/font_2725850_4fjofk1hanz.css">
+    <title>资源规划图</title>
+    <style>
+        html,
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        html {
+            font-size: calc(100vw/7.5);
+        }
+
+        #mapBox {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+        }
+
+        #tabs {
+            height: 0.8rem;
+            font-size: 0.25rem;
+            display: flex;
+            justify-content: space-around;
+            background-color: #fff;
+        }
+
+        #resource_info {
+            position: relative;
+        }
+
+        .tab_item {
+            width: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .active {
+            color: #19ada6;
+            border-bottom: 0.05rem solid #19ada6;
+        }
+
+        #item_list {
+            font-size: 0.2rem;
+            display: flex;
+            height: 1rem;
+            position: absolute;
+            z-index: 10;
+            background-color: #fff;
+            margin: 5px 10px;
+            width: -webkit-fill-available;
+            box-shadow: 1px 1px 3px #d7d7d7;
+            justify-content: space-around;
+        }
+
+        .resource_item {
+            /* flex: 1; */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            border-radius: 0.05rem;
+        }
+
+        .resource_item i {
+            font-size: 0.4rem;
+        }
+
+        #zoom_widg {
+            position: fixed;
+            bottom: 10px;
+        }
+
+        /*去除mapview拖动时的边框*/
+        .esri-view .esri-view-surface--inset-outline:focus::after {
+            outline: auto 0px Highlight !important;
+            outline: auto 0px -webkit-focus-ring-color !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div id="resource_info">
+            <div id="tabs">
+                <div class="tab_item" :class="{active:activeId===item.id}" v-for="item in mapInfo" :key="item.id"
+                    @click="changeTabs(item.id)">
+                    {{ item.name }}
+                </div>
+            </div>
+            <div id="item_list">
+                <div class="resource_item" :class="{active:activeChildId===item.id}" v-for="item in currentItems"
+                    :key="item.id" @click="changeChildItems(item)">
+                    <i class="iconfont" :class="item.icon"></i>
+                    <span>{{ item.name }}</span>
+
+                </div>
+            </div>
+            <div id="item_info">
+
+            </div>
+        </div>
+        <div id="mapBox">
+        </div>
+        <div id="zoom_widg"></div>
+    </div>
+
+</body>
+
+<!-- 开发环境版本，包含了有帮助的命令行警告 -->
+<script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+<!-- 生产环境版本，优化了尺寸和速度 -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/vue@2"></script> -->
+<!-- <script src="./lib"></script> -->
+<script src="https://js.arcgis.com/4.18/"></script>
+
+<script>
+    // VUE.js  控制DOM 内容
+    var app = new Vue({
+        el: '#app',
+        data: {
+            name: 'songjie',
+            activeId: 0,
+            activeChildId: -1,
+            mapInfo: [{
+                id: 0,
+                name: "产业地图",
+                children: [{
+                        id: 1000,
+                        name: "楼宇",
+                        icon: "icon-building-automation",
+                        layerUrl: "",
+                    },
+                    {
+                        id: 1001,
+                        name: "厂房",
+                        icon: "icon-changfang",
+                        layerUrl: "",
+                    }, {
+                        id: 1002,
+                        name: "科教资源",
+                        icon: "icon-kejiaoguanli",
+                        layerUrl: "",
+                    }
+                ]
+            }, {
+                id: 1,
+                name: "资源地图",
+                children: [{
+                    id: 2000,
+                    name: "光电子信息",
+                    icon: "icon-dc-icon-guangdianxinpian",
+                    layerUrl: ""
+                }, {
+                    id: 2001,
+                    name: "生命健康",
+                    icon: "icon-jiankang",
+                    layerUrl: ""
+                }, {
+                    id: 2002,
+                    name: "未来产业",
+                    icon: "icon-weilai",
+                    layerUrl: ""
+                }, ]
+            }],
+            currentItems: []
+        },
+        methods: {
+            changeTabs(e) {
+                this.activeId = e;
+                this.currentItems = this.mapInfo[e].children;
+                this.activeChildId = -1;
+            },
+            changeChildItems(item) {
+                this.activeChildId = item.id;
+            }
+        },
+        created() {
+            this.changeTabs(0);
+            // this.currentItems = this.mapInfo[this.activeId].children;
+        },
+    })
+</script>
+<script>
+    // arcgis_api.js  控制地图渲染 
+    require(["esri/Map", "esri/views/MapView", "esri/widgets/Zoom"], function (Map, MapView, Zoom) {
+        var map = new Map({
+            basemap: "topo-vector",
+
+        });
+
+        var view = new MapView({
+            container: "mapBox",
+            map: map,
+            center: [-118.805, 34.027], // longitude, latitude
+            zoom: 13,
+            constraints: {
+                snapToZoom: false
+            },
+        });
+        view.ui.empty("top-left");
+        const zoom = new Zoom({
+            view: view,
+            container: zoom_widg
+        });
+
+        // Add the widget to the top-right corner of the view
+        view.ui.add(zoom, "bottom-right");
+
+    });
+</script>
+
+</html>
