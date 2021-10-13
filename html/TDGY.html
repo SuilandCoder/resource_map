@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0,minimum-scale=1.0, user-scalable=no"> -->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+    <link rel="stylesheet" href="../css/normalize.css">
+    <link rel="stylesheet" href="https://js.arcgis.com/3.37/esri/css/esri.css">
+    <link rel="stylesheet" href="https://at.alicdn.com/t/font_2725850_4fjofk1hanz.css">
+
+    <title>土地供应</title>
+    <style>
+        html,
+        body {
+            padding: 0;
+            margin: 0;
+            position: relative;
+        }
+
+        html {
+            font-size: calc(100vw/7.5);
+        }
+
+        .dropdown {}
+
+        #searchBox {
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: #fff;
+        }
+
+
+        .searchInput {
+            margin-left: 2px;
+            border: 1px solid;
+            flex: auto;
+            font-size: 0.3rem;
+            height: 0.8rem;
+        }
+
+        .searchBtn {
+            width: 0.6rem;
+            height: 0.6rem;
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+
+            border: 1px solid;
+            border-left: 0px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .searchBtn>img {
+            width: 0.6rem;
+            height: 0.6rem;
+        }
+
+        #dropBtn {
+            width: 2.5rem;
+            height: 0.8rem;
+            font-size: 0.35rem;
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+            background-color: #fff;
+            border: 1px solid #1c1c1c;
+            display: flex;
+            align-items: center;
+        }
+
+        #dropBtn>span {
+            flex: 1 1.8rem;
+        }
+
+        .w18 {
+            width: 18px;
+        }
+
+        #dropBox {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+        }
+
+        #dropBox>button {
+            background-color: #fff;
+            border: 1px solid #999;
+            font-size: 0.35rem;
+            width: 2rem;
+            height: 0.8rem;
+        }
+
+        .myFeatureList {
+            /* position: relative; */
+            /* margin-top: 1rem; */
+            overflow: auto;
+
+        }
+
+        .featureInfo {
+            font-size: 0.3rem;
+            border-top: 1px solid #999;
+            border-bottom: 1px solid #999;
+            padding: 10px;
+        }
+
+        .featureTitle {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .featruePosition {
+            font-size: 0.25rem;
+        }
+
+        .featureType {
+            border-radius: 10px;
+            border: 1px solid #999;
+            padding: 2px;
+            display: inline-block;
+            font-size: 0.25rem;
+        }
+        .itemBottom{    
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <div class="featureBox">
+            <!-- <div>
+                <div id="searchBox">
+                    <button id="dropBtn" @click="showDropBox = !showDropBox"><span>{{featuresType}}</span>
+                        <image class="w18" src="../images/icons/上.png" v-show="!showDropBox"></image>
+                        <image class="w18" src="../images/icons/下.png" v-show="showDropBox"></image>
+                    </button>
+                    <input class="searchInput" type="search">
+                    <div class="searchBtn">
+                        <image src="../images/icons/搜索.png"></image>
+                    </div>
+                </div>
+                <div id="dropBox" v-show="showDropBox">
+                    <button @click="changeType('数字产业')">数字产业</button>
+                    <button @click="changeType('大健康')">大健康</button>
+                    <button @click="changeType('现代服务')">现代服务</button>
+                    <button @click="changeType('智能制造')">智能制造</button>
+                </div>
+            </div> -->
+
+            <div class="myFeatureList">
+                <div class="featureInfo" v-for="item in features">
+                    <div class="featureTitle">{{item.attributes['用地单位名称']}}（用地单位）</div>
+                    <div class="featureType">{{item.attributes['供地类型']}}</div>
+                    <div class="featureType">{{item.attributes['土地用途']}}</div>
+                    <div class="itemBottom">
+                        <div class="featruePosition">土地面积：{{parseNum(item.attributes['土地面积'])}}</div>
+                        <div class="featruePosition">年份：{{item.attributes['年份']}}</div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+<script src="../js/const.js"></script>
+<!-- 开发环境版本，包含了有帮助的命令行警告 -->
+<script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+<script src="http://localhost:8080/arcgis_js_v336_api/3.36/init.js"></script>
+
+
+<script>
+    // VUE.js  控制DOM 内容
+    var MyQuery;
+    var MyQueryTask;
+    var app = new Vue({
+        el: '#app',
+        data: {
+            features: [],
+            showDropBox: false,
+            featuresType: '',
+        },
+        methods: {
+            initArcGISQuery() {
+                require(["esri/tasks/query", "esri/tasks/QueryTask", ], (Query, QueryTask) => {
+                    MyQuery = Query;
+                    MyQueryTask = QueryTask;
+                    this.queryFeature("项目主管", "东西湖区", map_service_url.tdgy);
+                })
+            },
+            queryFeature(arg, val, url) {
+                var queryTask = new MyQueryTask(url);
+                var query = new MyQuery();
+                query.returnGeometry = false;
+                query.where = arg + "=" + "'" + val + "'";
+                query.outFields = ["*"];
+                queryTask.execute(query, (res) => {
+                    console.log("res:", res);
+                    this.features = res.features;
+                });
+            },
+            changeType(type) {
+                this.showDropBox = false;
+                this.featuresType = type;
+                // todo 
+                this.queryFeature("类型", type, map_service_url.company);
+            }
+        },
+        created() {
+
+        },
+        mounted() {
+            this.initArcGISQuery();
+
+        },
+        computed:{
+            parseNum(){
+                return function(num){
+                    return parseFloat(num).toFixed(6)
+                }
+            }
+        }
+    })
+</script>
+
+</html>
